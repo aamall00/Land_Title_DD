@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    @apply bg-slate-50 text-slate-900;
+  }
+  .font-kannada { font-family: 'Noto Sans Kannada', sans-serif; }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+           transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 focus:ring-slate-400;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+  .card {
+    @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+  }
+  .input {
+    @apply w-full px-3 py-2 rounded-lg border border-slate-300 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500
+           placeholder:text-slate-400;
+  }
+  .label {
+    @apply block text-sm font-medium text-slate-700 mb-1;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+/* Risk level badges */
+.risk-LOW      { @apply badge bg-green-100 text-green-800; }
+.risk-MEDIUM   { @apply badge bg-amber-100 text-amber-800; }
+.risk-HIGH     { @apply badge bg-red-100 text-red-800; }
+.risk-CRITICAL { @apply badge bg-red-900 text-red-100; }
+
+/* Check status badges */
+.status-PASS    { @apply badge bg-green-100 text-green-800; }
+.status-FAIL    { @apply badge bg-red-100 text-red-800; }
+.status-WARN    { @apply badge bg-amber-100 text-amber-800; }
+.status-MISSING { @apply badge bg-slate-100 text-slate-600; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { @apply bg-slate-100; }
+::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
