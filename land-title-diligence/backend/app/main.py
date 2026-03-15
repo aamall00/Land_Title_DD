@@ -1,7 +1,9 @@
 import logging
+import traceback
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.api.routes import properties, documents, queries, reports
@@ -35,6 +37,12 @@ app.include_router(properties.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(queries.router,   prefix="/api/v1")
 app.include_router(reports.router,   prefix="/api/v1")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logging.error("Unhandled exception: %s\n%s", exc, traceback.format_exc())
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @app.get("/health")

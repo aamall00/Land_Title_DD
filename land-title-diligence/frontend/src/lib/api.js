@@ -43,8 +43,10 @@ async function request(method, path, { body, formData, params } = {}) {
 
   const res = await fetch(url, init)
   if (res.status === 204) return null
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.detail ?? `HTTP ${res.status}`)
+  const text = await res.text()
+  let data = null
+  try { data = JSON.parse(text) } catch { /* non-JSON body */ }
+  if (!res.ok) throw new Error(data?.detail ?? (text || `HTTP ${res.status}`))
   return data
 }
 

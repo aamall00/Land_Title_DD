@@ -1,6 +1,6 @@
 """Embedding Service — converts text chunks to dense vectors.
 
-Uses `intfloat/multilingual-e5-large` (768-dim) which handles
+Uses `intfloat/multilingual-e5-base` (768-dim) which handles
 Kannada and English text in the same embedding space.
 """
 

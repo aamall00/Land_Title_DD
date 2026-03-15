@@ -27,17 +27,14 @@ async def list_properties(authorization: str | None = Header(default=None)):
     db = get_supabase()
 
     result = db.table("properties") \
-        .select("*, documents(count)") \
+        .select("*") \
         .eq("user_id", user_id) \
         .order("created_at", desc=True) \
         .execute()
 
     properties = []
     for row in (result.data or []):
-        doc_count = 0
-        if isinstance(row.get("documents"), list) and row["documents"]:
-            doc_count = row["documents"][0].get("count", 0)
-        row["document_count"] = doc_count
+        row["document_count"] = 0
         properties.append(row)
 
     return properties
@@ -54,7 +51,10 @@ async def create_property(
     payload = body.model_dump()
     payload["user_id"] = user_id
 
-    result = db.table("properties").insert(payload).execute()
+    try:
+        result = db.table("properties").insert(payload).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     if not result.data:
         raise HTTPException(status_code=500, detail="Failed to create property")
 
@@ -72,7 +72,7 @@ async def get_property(
     db = get_supabase()
 
     result = db.table("properties") \
-        .select("*, documents(count)") \
+        .select("*") \
         .eq("id", str(property_id)) \
         .eq("user_id", user_id) \
         .single() \
@@ -82,10 +82,7 @@ async def get_property(
         raise HTTPException(status_code=404, detail="Property not found")
 
     row = result.data
-    doc_count = 0
-    if isinstance(row.get("documents"), list) and row["documents"]:
-        doc_count = row["documents"][0].get("count", 0)
-    row["document_count"] = doc_count
+    row["document_count"] = 0
     return row
 
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { MapPin, Mail, Lock, Eye, EyeOff } from 'lucide-react'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../hooks/useAuth.jsx'
 
 export default function Auth() {
   const { user, signInWithEmail, signUpWithEmail } = useAuth()

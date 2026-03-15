@@ -14,11 +14,12 @@ class Settings(BaseSettings):
     claude_model: str = "claude-sonnet-4-6"
 
     # Embedding model (runs locally via sentence-transformers)
-    embedding_model: str = "intfloat/multilingual-e5-large"
+    embedding_model: str = "intfloat/multilingual-e5-base"
     embedding_dim: int = 768
 
     # OCR — choose 'tesseract' or 'textract'
     ocr_provider: str = "tesseract"
+    tesseract_cmd: str = ""   # Windows: C:\Program Files\Tesseract-OCR\tesseract.exe
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "ap-south-1"    # Mumbai — closest to Bangalore

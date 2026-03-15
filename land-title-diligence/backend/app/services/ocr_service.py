@@ -11,10 +11,15 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import pytesseract
+
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+_s = get_settings()
+if _s.tesseract_cmd:
+    pytesseract.pytesseract.tesseract_cmd = _s.tesseract_cmd
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
