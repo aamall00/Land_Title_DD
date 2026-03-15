@@ -6,6 +6,7 @@ from uuid import UUID
 from app.database import get_supabase
 from app.services.vector_service import similarity_search
 from app.services.llm_service import run_due_diligence_check
+from app.services.graph_service import get_property_graph_context
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,9 @@ async def generate_due_diligence_report(
     prop_result = db.table("properties").select("*").eq("id", str(property_id)).single().execute()
     property_meta = prop_result.data or {}
 
+    # Fetch knowledge graph context once — shared across all checks
+    kg_context = get_property_graph_context(property_id) or None
+
     check_results: dict = {}
     all_red_flags: list[str] = []
 
@@ -170,6 +174,7 @@ async def generate_due_diligence_report(
             check_prompt=check["prompt"],
             context_chunks=chunks,
             property_metadata=property_meta,
+            kg_context=kg_context,
         )
         check_results[check["key"]] = result
 

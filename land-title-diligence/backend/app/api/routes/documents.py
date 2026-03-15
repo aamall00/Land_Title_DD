@@ -11,6 +11,7 @@ from app.models.schemas import DocumentResponse, DocumentTypeUpdate, DocType
 from app.services.ocr_service import extract_text
 from app.services.embedding_service import chunk_text
 from app.services.vector_service import store_document_embeddings, delete_document_embeddings
+from app.services.graph_service import extract_and_store_entities, delete_document_entities
 from app.utils.document_classifier import classify_document, extract_metadata_from_text
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,21 @@ async def _process_document(document_id: str, property_id: str, file_bytes: byte
                 doc_type=doc_type,
                 extra_metadata=metadata,
             )
+
+        # Extract named entities and build knowledge graph (non-blocking)
+        if ocr_text.strip():
+            try:
+                entity_count, rel_count = extract_and_store_entities(
+                    document_id=document_id,
+                    property_id=property_id,
+                    ocr_text=ocr_text,
+                    doc_type=doc_type,
+                )
+                logger.info(
+                    f"Document {document_id} KG: {entity_count} entities, {rel_count} relationships"
+                )
+            except Exception as kg_err:
+                logger.warning(f"KG extraction failed for {document_id} (non-fatal): {kg_err}")
 
         logger.info(f"Document {document_id} processed: {doc_type}, {page_count} pages")
 
@@ -258,8 +274,9 @@ async def delete_document(
     except Exception as e:
         logger.warning(f"Storage delete failed (non-fatal): {e}")
 
-    # Remove embeddings
+    # Remove embeddings and knowledge graph data
     delete_document_embeddings(str(document_id))
+    delete_document_entities(str(document_id))
 
     # Remove document row (embeddings cascade-deleted above)
     db.table("documents").delete().eq("id", str(document_id)).execute()

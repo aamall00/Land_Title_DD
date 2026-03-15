@@ -45,8 +45,12 @@ def answer_question(
     question: str,
     context_chunks: list[dict],
     property_metadata: dict | None = None,
+    kg_context: str | None = None,
 ) -> tuple[str, int]:
     """Ask Claude a question grounded in retrieved document chunks.
+
+    Args:
+        kg_context: Optional knowledge graph summary to prepend for richer context.
 
     Returns:
         (answer: str, tokens_used: int)
@@ -71,7 +75,9 @@ def answer_question(
             f"Village: {property_metadata.get('village', 'N/A')}\n"
         )
 
-    user_message = f"""{property_str}
+    kg_str = f"\n{kg_context}\n" if kg_context else ""
+
+    user_message = f"""{property_str}{kg_str}
 Document excerpts:
 {context_str}
 
@@ -95,8 +101,13 @@ def run_due_diligence_check(
     check_prompt: str,
     context_chunks: list[dict],
     property_metadata: dict | None = None,
+    kg_context: str | None = None,
 ) -> dict:
     """Run a single structured due diligence check.
+
+    Args:
+        kg_context: Optional knowledge graph summary for additional entity context.
+
     Returns a dict with status, summary, findings, sources.
     """
     client = _get_client()
@@ -115,7 +126,9 @@ def run_due_diligence_check(
             f"Taluk: {property_metadata.get('taluk', 'N/A')}\n\n"
         )
 
-    prompt = f"""{property_str}Document excerpts:
+    kg_str = f"{kg_context}\n\n" if kg_context else ""
+
+    prompt = f"""{property_str}{kg_str}Document excerpts:
 {context_str}
 
 Check: {check_name}

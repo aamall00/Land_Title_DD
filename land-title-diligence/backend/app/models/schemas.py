@@ -152,6 +152,38 @@ class DueDiligenceContent(BaseModel):
     summary:             str = ""
 
 
+# ── Knowledge Graph ────────────────────────────────────────────────────────
+
+class EntityResponse(BaseModel):
+    id:           UUID
+    document_id:  UUID
+    property_id:  UUID
+    entity_type:  str
+    value:        str
+    canonical_id: Optional[UUID] = None
+    metadata:     dict[str, Any] = {}
+    created_at:   datetime
+
+
+class RelationshipResponse(BaseModel):
+    id:            UUID
+    document_id:   UUID
+    property_id:   UUID
+    source_entity: UUID
+    target_entity: UUID
+    relation_type: str
+    attributes:    dict[str, Any] = {}
+    created_at:    datetime
+
+
+class CanonicalEntityResponse(BaseModel):
+    id:            UUID
+    entity_type:   str
+    canonical_val: str
+    aliases:       list[str] = []
+    created_at:    datetime
+
+
 # ── Report ─────────────────────────────────────────────────────────────────
 
 class ReportRequest(BaseModel):

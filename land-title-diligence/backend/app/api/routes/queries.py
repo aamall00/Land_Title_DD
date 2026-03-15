@@ -7,6 +7,7 @@ from app.database import get_supabase
 from app.models.schemas import QueryRequest, QueryResponse, QuerySource
 from app.services.vector_service import similarity_search
 from app.services.llm_service import answer_question
+from app.services.graph_service import get_property_graph_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/properties/{property_id}/query", tags=["Query"])
@@ -60,11 +61,15 @@ async def ask_question(
             detail="No documents found for this property. Please upload and process documents first.",
         )
 
+    # Fetch knowledge graph context for richer entity-aware answers
+    kg_context = get_property_graph_context(str(property_id))
+
     # Ask Claude
     answer, tokens_used = answer_question(
         question=body.question,
         context_chunks=chunks,
         property_metadata=property_meta,
+        kg_context=kg_context or None,
     )
 
     # Build source list — join with documents table for names
