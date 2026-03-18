@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.api.routes import properties, documents, queries, reports
+from app.api.routes import properties, documents, queries, reports, graph
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,6 +37,7 @@ app.include_router(properties.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(queries.router,   prefix="/api/v1")
 app.include_router(reports.router,   prefix="/api/v1")
+app.include_router(graph.router,     prefix="/api/v1")
 
 
 @app.exception_handler(Exception)

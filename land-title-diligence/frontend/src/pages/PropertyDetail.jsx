@@ -2,19 +2,21 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, MapPin, FileText, MessageSquare, ClipboardList,
-  RefreshCw, Info
+  RefreshCw, Info, Share2
 } from 'lucide-react'
 import Header from '../components/layout/Header'
 import DocumentUpload from '../components/documents/DocumentUpload'
 import DocumentList   from '../components/documents/DocumentList'
 import QueryInterface  from '../components/query/QueryInterface'
 import ReportView      from '../components/report/ReportView'
+import KnowledgeGraph  from '../components/graph/KnowledgeGraph'
 import { api } from '../lib/api'
 
 const TABS = [
-  { id: 'documents', label: 'Documents',    icon: FileText },
-  { id: 'query',     label: 'Ask / Q&A',    icon: MessageSquare },
+  { id: 'documents', label: 'Documents',       icon: FileText },
+  { id: 'query',     label: 'Ask / Q&A',       icon: MessageSquare },
   { id: 'report',    label: 'Due Diligence Report', icon: ClipboardList },
+  { id: 'graph',     label: 'Knowledge Graph', icon: Share2 },
 ]
 
 export default function PropertyDetail() {
@@ -225,6 +227,12 @@ export default function PropertyDetail() {
                 existingReports={reports}
                 onGenerated={handleReportGenerated}
               />
+            </div>
+          )}
+
+          {tab === 'graph' && (
+            <div className="card p-4 pb-8">
+              <KnowledgeGraph propertyId={id} />
             </div>
           )}
         </div>

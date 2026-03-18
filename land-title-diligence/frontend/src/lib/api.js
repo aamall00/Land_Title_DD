@@ -80,4 +80,8 @@ export const api = {
     get:      (pid, rid)    => request('GET',  `/properties/${pid}/reports/${rid}`),
     generate: (pid, body)   => request('POST', `/properties/${pid}/reports`, { body }),
   },
+
+  graph: {
+    get: (pid) => request('GET', `/properties/${pid}/graph`),
+  },
 }

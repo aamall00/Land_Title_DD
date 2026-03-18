@@ -50,6 +50,30 @@ class PropertyCreate(BaseModel):
 
 
 class PropertyUpdate(BaseModel):
+    """
+    PropertyUpdate schema for partial property information updates.
+
+    This Pydantic BaseModel is used for PATCH/PUT requests to update existing property records.
+    All fields are optional, allowing clients to update only the properties they need to modify
+    without requiring a complete property object.
+
+    Attributes:
+        property_name (Optional[str]): The name or identifier of the property. Can be None if not being updated.
+        survey_number (Optional[str]): The official survey number assigned to the property. Can be None if not being updated.
+        khata_number (Optional[str]): The khata (tax) number for property tax identification. Can be None if not being updated.
+        taluk (Optional[str]): The taluk (administrative subdivision) where the property is located. Can be None if not being updated.
+        hobli (Optional[str]): The hobli (sub-district) administrative division. Can be None if not being updated.
+        village (Optional[str]): The village name where the property is situated. Can be None if not being updated.
+        district (Optional[str]): The district name for geographical classification. Can be None if not being updated.
+        total_area (Optional[str]): The total area of the property (typically in square feet or acres). Can be None if not being updated.
+        address (Optional[str]): The complete physical address of the property. Can be None if not being updated.
+        notes (Optional[str]): Additional notes or remarks about the property. Can be None if not being updated.
+
+    Note:
+        All fields use Optional[str] annotation, meaning each field can accept either a string value or None.
+        This design pattern enables partial updates where only non-None fields need to be processed,
+        while None values indicate no update is required for that particular field.
+    """
     property_name: Optional[str] = None
     survey_number: Optional[str] = None
     khata_number:  Optional[str] = None
