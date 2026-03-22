@@ -136,7 +136,7 @@ def extract_entities_from_text(ocr_text: str, doc_type: str) -> dict[str, Any]:
     try:
         response = client.messages.create(
             model=s.claude_model,
-            max_tokens=2048,
+            max_tokens=8192,
             system=system,
             messages=[{"role": "user", "content": f"Document text:\n\n{text_sample}"}],
         )
@@ -145,10 +145,13 @@ def extract_entities_from_text(ocr_text: str, doc_type: str) -> dict[str, Any]:
 
         # Strip accidental markdown fences
         if raw.startswith("```"):
-            parts = raw.split("```")
-            raw = parts[1] if len(parts) > 1 else raw
+            # Remove opening fence (```json or ```)
+            raw = raw[3:]
             if raw.startswith("json"):
                 raw = raw[4:]
+            # Remove closing fence if present
+            if raw.endswith("```"):
+                raw = raw[:-3]
         raw = raw.strip()
 
         result = json.loads(raw)
@@ -163,6 +166,25 @@ def extract_entities_from_text(ocr_text: str, doc_type: str) -> dict[str, Any]:
 
     except json.JSONDecodeError as e:
         logger.error(f"NER JSON parse error for doc_type={doc_type}: {e}")
+        # Attempt partial recovery: extract whatever arrays were completed before truncation
+        try:
+            import re
+            entities, relationships = [], []
+            # Try to pull out the entities array even if relationships was cut off
+            m = re.search(r'"entities"\s*:\s*(\[.*?\])', raw, re.DOTALL)
+            if m:
+                entities = json.loads(m.group(1))
+            m = re.search(r'"relationships"\s*:\s*(\[.*?\])', raw, re.DOTALL)
+            if m:
+                relationships = json.loads(m.group(1))
+            if entities or relationships:
+                logger.warning(
+                    f"NER partial recovery: {len(entities)} entities, "
+                    f"{len(relationships)} relationships for doc_type={doc_type}"
+                )
+                return {"entities": entities, "relationships": relationships}
+        except Exception:
+            pass
         return {"entities": [], "relationships": []}
     except Exception as e:
         logger.error(f"NER extraction failed for doc_type={doc_type}: {e}", exc_info=True)
