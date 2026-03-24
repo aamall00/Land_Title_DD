@@ -17,12 +17,13 @@ class Settings(BaseSettings):
     embedding_model: str = "intfloat/multilingual-e5-base"
     embedding_dim: int = 768
 
-    # OCR — choose 'tesseract' or 'textract'
+    # OCR — choose 'tesseract', 'textract', or 'google_vision'
     ocr_provider: str = "tesseract"
     tesseract_cmd: str = ""   # Windows: C:\Program Files\Tesseract-OCR\tesseract.exe
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "ap-south-1"    # Mumbai — closest to Bangalore
+    google_application_credentials: str = ""  # path to GCP service account JSON
 
     # App
     app_env: str = "development"

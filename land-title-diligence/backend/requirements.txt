@@ -26,6 +26,12 @@ PyMuPDF==1.24.10      # PDF → image (fitz)
 # OCR — AWS Textract (optional)
 boto3==1.35.20
 
+# OCR — image preprocessing
+opencv-python==4.10.0.84
+
+# OCR — Google Cloud Vision (optional, best for handwritten Kannada)
+google-cloud-vision==3.7.4
+
 # Utilities
 python-jose[cryptography]==3.3.0
 httpx==0.27.2
