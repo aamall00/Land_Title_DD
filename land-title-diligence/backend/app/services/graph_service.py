@@ -72,6 +72,113 @@ def _resolve_canonical(db, entity_type: str, value: str) -> str | None:
 
 # ── Main store function ────────────────────────────────────────────────────
 
+# ── Orphan-linker configuration ────────────────────────────────────────────
+#
+# Graph model has TWO anchor levels:
+#
+#   PROPERTY  ←[PERTAINS_TO]─  DOCUMENT  ─[...]→  transaction entities
+#       │                                           (parties, dates, amounts)
+#       └──[BOUNDED_BY / SITUATED_IN / ...]→  physical/location entities
+#
+# Transaction-specific entities anchor to the DOCUMENT node so that the same
+# person appearing as buyer in one deed and seller in another is unambiguous.
+# Physical/permanent attributes (survey no, area, boundaries) anchor directly
+# to PROPERTY.
+
+# Level-2: entities that belong to the DOCUMENT, not directly to PROPERTY
+_DOCUMENT_ANCHORED_TYPES = frozenset({
+    # Transaction parties
+    "VENDOR", "VENDEE", "WITNESS", "POA_HOLDER",
+    "GRANTOR", "GRANTEE",
+    # Registration / office
+    "SRO", "BANK",
+    # Dates
+    "EXECUTION_DATE", "REGISTRATION_DATE",
+    "EC_PERIOD_FROM", "EC_PERIOD_TO",
+    # Financial
+    "CONSIDERATION", "STAMP_DUTY", "GUIDANCE_VALUE", "AMOUNT",
+    # Document references
+    "DOCUMENT_NO", "PRIOR_DEED", "TRANSACTION", "CHARGE", "MORTGAGE", "RELEASE",
+    # Mutation / Khata
+    "PREVIOUS_OWNER", "MUTATION_NO", "MUTATION_DATE",
+    "KHATA_NO", "ANNUAL_TAX", "ASSESSMENT_YEAR", "ASSESSMENT_NO",
+    "LAND_REVENUE", "LIABILITY", "REASON",
+    # Owner is transaction-specific (khata/mutation doc context)
+    "OWNER", "OCCUPANT",
+})
+
+# Level-1: entities that anchor directly to PROPERTY (physical/permanent)
+_PROPERTY_ANCHORED_TYPES = frozenset({
+    "SURVEY_NO", "HISSA_NO", "LAYOUT", "SITE_NO",
+    "AREA", "SITE_AREA", "BOUNDARY",
+    "LAND_CLASS", "CROP", "WATER_SOURCE",
+    "VILLAGE", "HOBLI", "TALUK", "WARD", "ULB", "SITE_ADDRESS",
+})
+
+# Preferred relationship type when synthetically anchoring an orphan
+_ORPHAN_REL: dict[str, str] = {
+    # Parties → DOCUMENT
+    "VENDOR":            "HAS_VENDOR",
+    "VENDEE":            "HAS_VENDEE",
+    "WITNESS":           "ATTESTED_BY",
+    "POA_HOLDER":        "ACTS_ON_BEHALF_OF",
+    "GRANTOR":           "INVOLVES_GRANTOR",
+    "GRANTEE":           "INVOLVES_GRANTEE",
+    "SRO":               "REGISTERED_AT",
+    "BANK":              "INVOLVES_BANK",
+    # Dates → DOCUMENT
+    "EXECUTION_DATE":    "EXECUTED_ON",
+    "REGISTRATION_DATE": "REGISTERED_ON",
+    "EC_PERIOD_FROM":    "VALID_FROM",
+    "EC_PERIOD_TO":      "VALID_TO",
+    "MUTATION_DATE":     "MUTATED_ON",
+    "ASSESSMENT_YEAR":   "ASSESSED_FOR",
+    # Financial → DOCUMENT
+    "CONSIDERATION":     "TRANSACTED_FOR",
+    "STAMP_DUTY":        "TRANSACTED_FOR",
+    "GUIDANCE_VALUE":    "TRANSACTED_FOR",
+    "AMOUNT":            "DOCUMENT_AMOUNT",
+    "ANNUAL_TAX":        "ASSESSED_FOR",
+    # Mutation / Khata → DOCUMENT
+    "PREVIOUS_OWNER":    "TRANSFERRED_TO",
+    "MUTATION_NO":       "HAS_MUTATION",
+    "KHATA_NO":          "HAS_KHATA",
+    "OWNER":             "OWNED_BY",
+    "OCCUPANT":          "CULTIVATED_BY",
+    # Physical → PROPERTY
+    "SURVEY_NO":         "PART_OF",
+    "BOUNDARY":          "BOUNDED_BY",
+    "VILLAGE":           "SITUATED_IN",
+    "TALUK":             "SITUATED_IN",
+    "LAND_CLASS":        "CLASSIFIED_AS",
+}
+
+# Within DOCUMENT-anchored orphans, prefer these party types as secondary anchors
+_DOC_PARTY_PRIORITY = [
+    "VENDOR", "VENDEE", "OWNER", "GRANTOR", "GRANTEE", "OCCUPANT",
+]
+# Within PROPERTY-anchored orphans, prefer these
+_PROP_ANCHOR_PRIORITY = ["PROPERTY", "SURVEY_NO"]
+
+
+def _find_doc_party(entity_id_map: dict[tuple[str, str], str]) -> tuple[str, str] | None:
+    """Return key of the best document-level party anchor."""
+    for anchor_type in _DOC_PARTY_PRIORITY:
+        for key in entity_id_map:
+            if key[0] == anchor_type:
+                return key
+    return None
+
+
+def _find_property_anchor(entity_id_map: dict[tuple[str, str], str]) -> tuple[str, str] | None:
+    """Return key of the best property-level anchor."""
+    for anchor_type in _PROP_ANCHOR_PRIORITY:
+        for key in entity_id_map:
+            if key[0] == anchor_type:
+                return key
+    return None
+
+
 def extract_and_store_entities(
     document_id: str,
     property_id: str,
@@ -92,6 +199,26 @@ def extract_and_store_entities(
     if not entities_raw:
         logger.info(f"No entities extracted for document {document_id}")
         return 0, 0
+
+    # ── Strategy 3: synthetic DOCUMENT anchor node ─────────────────────────
+    # Insert a virtual node representing the document. Transaction-specific
+    # entities (parties, dates, amounts) will hang off this node.
+    # The document itself is later linked to PROPERTY via PERTAINS_TO.
+    doc_anchor_id: str | None = None
+    try:
+        doc_canonical_id = _resolve_canonical(db, "DOCUMENT", document_id)
+        res = db.table("entities").insert({
+            "document_id": document_id,
+            "property_id": property_id,
+            "entity_type": "DOCUMENT",
+            "value": document_id,
+            "canonical_id": doc_canonical_id,
+            "metadata": {"doc_type": doc_type, "synthetic": True},
+        }).execute()
+        if res.data:
+            doc_anchor_id = res.data[0]["id"]
+    except Exception as e:
+        logger.warning(f"Document anchor node creation failed: {e}")
 
     # ── Persist entities ───────────────────────────────────────────────────
     # Maps (entity_type, value) → db UUID for relationship resolution
@@ -127,6 +254,10 @@ def extract_and_store_entities(
 
     # ── Persist relationships ──────────────────────────────────────────────
     rel_count = 0
+
+    # Track which entity IDs already have at least one relationship
+    connected_ids: set[str] = set()
+
     for rel in relationships_raw:
         src_type = (rel.get("source_type") or "").strip().upper()
         src_val = (rel.get("source_value") or "").strip()
@@ -158,8 +289,83 @@ def extract_and_store_entities(
                 "attributes": attributes,
             }).execute()
             rel_count += 1
+            connected_ids.add(source_id)
+            connected_ids.add(target_id)
         except Exception as e:
             logger.warning(f"Relationship insert failed ({relation_type}): {e}")
+
+    # ── Link DOCUMENT anchor → PROPERTY ───────────────────────────────────
+    # The document node connects to the PROPERTY entity (Level-1 anchor) so
+    # that all transaction-specific entities hanging off DOCUMENT are
+    # reachable from PROPERTY through the document hop.
+    if doc_anchor_id:
+        prop_key = _find_property_anchor(entity_id_map)
+        if prop_key:
+            prop_entity_id = entity_id_map[prop_key]
+            try:
+                db.table("relationships").insert({
+                    "document_id": document_id,
+                    "property_id": property_id,
+                    "source_entity": doc_anchor_id,
+                    "target_entity": prop_entity_id,
+                    "relation_type": "PERTAINS_TO",
+                    "attributes": {"synthetic": True},
+                }).execute()
+                rel_count += 1
+                connected_ids.add(doc_anchor_id)
+                connected_ids.add(prop_entity_id)
+            except Exception as e:
+                logger.warning(f"DOCUMENT→PROPERTY link failed: {e}")
+
+    # ── Strategy 2: orphan linker ──────────────────────────────────────────
+    # For every unconnected entity, route it to the correct anchor level:
+    #   - Document-anchored types  → DOCUMENT node  (parties, dates, amounts)
+    #   - Property-anchored types  → PROPERTY node  (physical attributes)
+    #   - Anything else            → DOCUMENT node  (safe default)
+    orphan_count = 0
+    for (etype, evalue), eid in entity_id_map.items():
+        if eid in connected_ids:
+            continue  # already connected
+
+        rel_type = _ORPHAN_REL.get(etype, "SOURCED_FROM")
+
+        if etype in _PROPERTY_ANCHORED_TYPES:
+            # Physical / permanent attribute → anchor to PROPERTY
+            anchor_key = _find_property_anchor(entity_id_map)
+            anchor_id = entity_id_map[anchor_key] if anchor_key else doc_anchor_id
+        elif etype in _DOCUMENT_ANCHORED_TYPES:
+            # Transaction-specific → prefer a same-document party, then DOCUMENT node
+            party_key = _find_doc_party(entity_id_map)
+            if party_key and party_key != (etype, evalue):
+                anchor_id = entity_id_map[party_key]
+            else:
+                anchor_id = doc_anchor_id
+        else:
+            # Unknown type → fall back to DOCUMENT node
+            anchor_id = doc_anchor_id
+            rel_type = "SOURCED_FROM"
+
+        if not anchor_id:
+            logger.debug(f"No anchor found for orphan {etype}/{evalue}")
+            continue
+
+        try:
+            db.table("relationships").insert({
+                "document_id": document_id,
+                "property_id": property_id,
+                "source_entity": anchor_id,
+                "target_entity": eid,
+                "relation_type": rel_type,
+                "attributes": {"synthetic": True},
+            }).execute()
+            rel_count += 1
+            orphan_count += 1
+            connected_ids.add(eid)
+        except Exception as e:
+            logger.warning(f"Orphan link failed for {etype}/{evalue}: {e}")
+
+    if orphan_count:
+        logger.info(f"Document {document_id}: synthetic edges added for {orphan_count} orphan nodes")
 
     logger.info(
         f"Document {document_id}: stored {len(entity_id_map)} entities, "

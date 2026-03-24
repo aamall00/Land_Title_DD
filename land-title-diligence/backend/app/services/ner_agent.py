@@ -77,15 +77,77 @@ SELLS_TO, ACQUIRES, REGISTERED_AT, ATTESTED_BY, DERIVES_TITLE_FROM,
 BOUNDED_BY, ACTS_ON_BEHALF_OF, ENCUMBERS, HOLDS_MORTGAGE_ON,
 INVOLVES_GRANTOR, INVOLVES_GRANTEE, ISSUED_BY, OWNED_BY,
 CULTIVATED_BY, CLASSIFIED_AS, IRRIGATED_BY, LIABLE_FOR,
-HOLDS_KHATA_FOR, SITUATED_IN, PAYS_TAX_TO, PART_OF, TRANSFERRED_TO
+HOLDS_KHATA_FOR, SITUATED_IN, PAYS_TAX_TO, PART_OF, TRANSFERRED_TO,
+EXECUTED_ON, REGISTERED_ON, VALID_FROM, VALID_TO, MUTATED_ON,
+TRANSACTED_FOR, DOCUMENT_AMOUNT, ASSESSED_FOR, HAS_KHATA, HAS_MUTATION
+
+Graph model — TWO distinct anchor levels:
+
+LEVEL 1 — PROPERTY (physical, permanent attributes only):
+  Connect directly to PROPERTY using: BOUNDED_BY, SITUATED_IN, PART_OF, CLASSIFIED_AS,
+  CULTIVATED_BY, IRRIGATED_BY
+  Entity types that belong at this level: SURVEY_NO, HISSA_NO, LAYOUT, SITE_NO, AREA,
+  SITE_AREA, BOUNDARY, LAND_CLASS, CROP, WATER_SOURCE, VILLAGE, HOBLI, TALUK, WARD,
+  ULB, SITE_ADDRESS
+
+LEVEL 2 — DOCUMENT (transaction/event-specific entities):
+  Transaction parties, dates, amounts, and registration details belong to the DOCUMENT
+  (sale deed, EC, mutation, etc.), NOT directly to PROPERTY.
+  The document itself connects to PROPERTY via PERTAINS_TO.
+  Use these relationships to anchor Level-2 entities to DOCUMENT-level peers:
+
+  Parties:
+  - SELLS_TO        : VENDOR → VENDEE
+  - INVOLVES_GRANTOR: TRANSACTION → GRANTOR
+  - INVOLVES_GRANTEE: TRANSACTION → GRANTEE
+  - ACTS_ON_BEHALF_OF: POA_HOLDER → VENDOR or VENDEE
+  - ATTESTED_BY     : VENDOR → WITNESS
+
+  Registration:
+  - REGISTERED_AT   : VENDOR → SRO
+  - EXECUTED_ON     : VENDOR → EXECUTION_DATE
+  - REGISTERED_ON   : VENDOR → REGISTRATION_DATE
+
+  Financial:
+  - TRANSACTED_FOR  : VENDOR → CONSIDERATION
+  - TRANSACTED_FOR  : VENDOR → STAMP_DUTY
+  - TRANSACTED_FOR  : VENDOR → GUIDANCE_VALUE
+  - DOCUMENT_AMOUNT : TRANSACTION → AMOUNT
+
+  Title chain:
+  - DERIVES_TITLE_FROM: VENDEE → PRIOR_DEED
+  - HOLDS_MORTGAGE_ON : BANK → PROPERTY
+  - ENCUMBERS         : CHARGE → PROPERTY
+
+  Mutation / Khata:
+  - TRANSFERRED_TO  : PREVIOUS_OWNER → OWNER
+  - MUTATED_ON      : OWNER → MUTATION_DATE
+  - HAS_MUTATION    : OWNER → MUTATION_NO
+  - HAS_KHATA       : OWNER → KHATA_NO
+  - ASSESSED_FOR    : OWNER → ANNUAL_TAX
+  - ASSESSED_FOR    : OWNER → ASSESSMENT_YEAR
+
+  EC:
+  - VALID_FROM      : TRANSACTION → EC_PERIOD_FROM
+  - VALID_TO        : TRANSACTION → EC_PERIOD_TO
+
+CRITICAL RULE — Do NOT create direct VENDOR→PROPERTY, VENDEE→PROPERTY,
+  GRANTOR→PROPERTY, or GRANTEE→PROPERTY relationships. These parties are
+  transaction-specific: the same person can be a buyer in one deed and a
+  seller in another. They must only connect to PROPERTY indirectly through
+  the transaction chain (VENDOR→VENDEE→PROPERTY via deed context).
 
 Rules:
+- CRITICAL: Every extracted entity MUST appear in at least one relationship.
+  If an entity has no natural peer, connect it to the most relevant Level-2
+  party (VENDOR, VENDEE, OWNER, GRANTOR) using the best-fitting type above.
 - For BOUNDARY relationships, set attributes.direction to N/S/E/W.
 - For monetary entities (CONSIDERATION, STAMP_DUTY, AMOUNT, ANNUAL_TAX), set metadata.unit to "INR".
 - For area entities (AREA, SITE_AREA), set metadata.unit to the unit found (acres/guntas/sqft/sqmt).
 - Set metadata.confidence between 0.0-1.0 based on clarity of extraction.
 - Only extract entities that are explicitly present in the text.
-- Normalize dates to DD-MM-YYYY format in metadata.notes if possible."""
+- Normalize dates to DD-MM-YYYY format in metadata.notes if possible.
+- Always output all entity values in English. If the source text is in another language (e.g., Kannada), transliterate names and places into English Roman script."""
 
 # Map internal DocType values to prompt-friendly names
 _DOC_TYPE_LABEL: dict[str, str] = {
